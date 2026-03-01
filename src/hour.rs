@@ -30,7 +30,7 @@ impl Hour {
         self.minimum_workers_per_role[&role]
     }
 
-    pub fn min_avg_strength(&self) -> f32 {
+    pub fn minimum_average_strength(&self) -> f32 {
         self.minimum_average_strength
     }
 }
