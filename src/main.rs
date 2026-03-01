@@ -40,5 +40,11 @@ fn main() {
         }
     }
 
-    let mut persons_hours: HashMap<PersonId, u32> = HashMap::new();
+    for person in &people {
+        model.add_constraint(constraint!(
+            hours.iter().fold(Expression::default(), |lhs, hour| {
+                lhs + assigned[&(hour.id(), person.id())]
+            }) >= person.min_weekly_hours() as i32
+        ));
+    }
 }

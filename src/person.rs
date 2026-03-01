@@ -20,4 +20,12 @@ impl Person {
     pub fn available(&self, hour_id: HourId) -> bool {
         self.availability.contains(&hour_id)
     }
+
+    pub fn max_weekly_hours(&self) -> u32 {
+        self.maximum_weekly_hours
+    }
+
+    pub fn min_weekly_hours(&self) -> u32 {
+        self.minimum_weekly_hours
+    }
 }
