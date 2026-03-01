@@ -20,7 +20,6 @@ fn main() {
     // Must be run for one week at a time.
 
     let hours: Vec<Vec<Hour>> = Vec::new();
-
     let hours_flat: Vec<&Hour> = hours.iter().flat_map(|day| day.iter()).collect();
     let people: Vec<Person> = Vec::new();
     let roles: Vec<RoleId> = Vec::new();
@@ -28,26 +27,26 @@ fn main() {
     let mut variables = ProblemVariables::new();
 
     let mut assigned: HashMap<(HourId, PersonId), Variable> = HashMap::new();
-    let mut assigned_length_time: HashMap<(HourId, u32, PersonId), Variable> = HashMap::new();
+    let mut assigned_to_period: HashMap<(HourId, u32, PersonId), Variable> = HashMap::new();
 
-    // Create the assignment variables
-    for hour in &hours_flat {
+    // Create the assignment variables.
+    for &hour in &hours_flat {
         for person in &people {
             assigned.insert((hour.id(), person.id()), variables.add(variable().binary()));
         }
     }
 
-    // Create the variables which indicate if someone is assigned for a certain length of time, starting at a certain hour
+    // Create the variables which indicate if someone is assigned for a certain period.
     for person in &people {
         for day in &hours {
-            for length in (0..=MINIMUM_SHIFT_LENGTH).chain(MAXIMUM_SHIFT_LENGTH + 1..=24) {
-                for (i, hour) in day.iter().enumerate() {
-                    if day.len() - i <= length as usize {
+            for period_length in (0..=MINIMUM_SHIFT_LENGTH).chain(MAXIMUM_SHIFT_LENGTH + 1..=24) {
+                for (hour_index, hour) in day.iter().enumerate() {
+                    if day.len() - hour_index < period_length as usize {
                         continue;
                     }
 
-                    assigned_length_time.insert(
-                        (hour.id(), length, person.id()),
+                    assigned_to_period.insert(
+                        (hour.id(), period_length, person.id()),
                         variables.add(variable().binary()),
                     );
                 }
@@ -55,7 +54,8 @@ fn main() {
         }
     }
 
-    let total_wages_paid = hours_flat.iter().fold(Expression::default(), |lhs, hour| {
+    // The total wages paid for this week.
+    let total_wages_paid = hours_flat.iter().fold(Expression::default(), |lhs, &hour| {
         lhs + people.iter().fold(Expression::default(), |lhs, person| {
             lhs + assigned[&(hour.id(), person.id())] * person.hourly_rate()
         })
@@ -64,7 +64,7 @@ fn main() {
     let mut model = variables.minimise(total_wages_paid).using(scip);
 
     // Ensures that people are only assigned to hours they are available for.
-    for hour in &hours_flat {
+    for &hour in &hours_flat {
         for person in &people {
             if person.available(hour.id()) {
                 model.add_constraint(constraint!(assigned[&(hour.id(), person.id())] <= 1));
@@ -74,16 +74,15 @@ fn main() {
         }
     }
 
-    // Ensures that there are sufficient workers of each role for each shift.
-    for hour in &hours_flat {
+    // Ensures that there are sufficient workers of each role for each hour.
+    for &hour in &hours_flat {
         for role in &roles {
-            let coverage = people.iter().fold(Expression::default(), |lhs, person| {
-                if person.role() == *role {
+            let coverage = people
+                .iter()
+                .filter(|&person| person.role() == *role)
+                .fold(Expression::default(), |lhs, person| {
                     lhs + assigned[&(hour.id(), person.id())]
-                } else {
-                    lhs
-                }
-            });
+                });
 
             model.add_constraint(constraint!(coverage >= hour.minimum_workers(*role) as i32));
         }
@@ -106,50 +105,58 @@ fn main() {
     }
 
     // Ensures that the minimum average strength target for each hour is met.
-    for hour in &hours_flat {
+    for &hour in &hours_flat {
+        let total_strength = people.iter().fold(Expression::default(), |lhs, person| {
+            lhs + assigned[&(hour.id(), person.id())] * person.strength()
+        });
+
+        let minimum_average_strength = hour.min_avg_strength() as i32;
+
+        let people_working_this_hour = people.iter().fold(Expression::default(), |lhs, person| {
+            lhs + assigned[&(hour.id(), person.id())]
+        });
+
         model.add_constraint(constraint!(
-            people.iter().fold(Expression::default(), |lhs, person| {
-                lhs + assigned[&(hour.id(), person.id())] * person.strength()
-            }) >= (hour.min_avg_strength() as i32)
-                * people.iter().fold(Expression::default(), |lhs, person| {
-                    lhs + assigned[&(hour.id(), person.id())]
-                })
+            total_strength >= minimum_average_strength * people_working_this_hour
         ));
     }
 
-    // Makes sure that the variables which indicate if someone is assigned for a certain length of time, starting at a certain hour are synced
+    // Makes sure that the variables which indicate if someone is assigned for a certain period have the correct value.
     for person in &people {
         for day in &hours {
-            for length in (0..=MINIMUM_SHIFT_LENGTH).chain(MAXIMUM_SHIFT_LENGTH + 1..=24) {
+            for length in (1..=MINIMUM_SHIFT_LENGTH).chain(MAXIMUM_SHIFT_LENGTH + 1..=24) {
                 for (start_hour_index, hour) in day.iter().enumerate() {
-                    if day.len() - start_hour_index <= length as usize {
+                    if day.len() - start_hour_index < length as usize {
                         continue;
                     }
 
-                    let is_assigned_length_time =
-                        assigned_length_time[&(hour.id(), length, person.id())];
+                    // This variable indicates if someone is assigned to a certain period.
+                    // This is the variable we are trying to ensure is correct.
+                    let is_assigned_to_period =
+                        assigned_to_period[&(hour.id(), length, person.id())];
 
-                    let count_assigned_shifts_in_period =
+                    // The number of hours which the person is assigned to within this period.
+                    let assigned_hours_in_this_period =
                         (0..length as usize).fold(Expression::default(), |lhs, hour_offset| {
                             lhs + assigned[&(day[start_hour_index + hour_offset].id(), person.id())]
                         });
 
                     // Forces the variable to be 0 if it should be 0
                     model.add_constraint(constraint!(
-                        is_assigned_length_time * length <= count_assigned_shifts_in_period.clone()
+                        is_assigned_to_period * length <= assigned_hours_in_this_period.clone()
                     ));
 
                     // Forces the variable to be 1 if it should be 1
                     model.add_constraint(constraint!(
-                        is_assigned_length_time * length
-                            >= count_assigned_shifts_in_period - length + 1
+                        is_assigned_to_period * length
+                            >= assigned_hours_in_this_period - length + 1
                     ));
                 }
             }
         }
     }
 
-    // Ensures that no shifts are less long than the minimum shift length
+    // Ensures that no shifts are less long than the minimum shift length.
     for person in &people {
         for day in &hours {
             for length in 2..=MINIMUM_SHIFT_LENGTH {
@@ -157,10 +164,10 @@ fn main() {
                 let lhs = day.iter().enumerate().fold(
                     Expression::default(),
                     |lhs, (start_hour_index, hour)| {
-                        if day.len() - start_hour_index <= (length - 1) as usize {
+                        if day.len() - start_hour_index < (length - 1) as usize {
                             lhs
                         } else {
-                            lhs + assigned_length_time[&(hour.id(), length - 1, person.id())]
+                            lhs + assigned_to_period[&(hour.id(), length - 1, person.id())]
                         }
                     },
                 );
@@ -172,7 +179,7 @@ fn main() {
                         if day.len() - start_hour_index <= length as usize {
                             lhs
                         } else {
-                            lhs + assigned_length_time[&(hour.id(), length, person.id())]
+                            lhs + assigned_to_period[&(hour.id(), length, person.id())]
                         }
                     },
                 );
@@ -193,12 +200,11 @@ fn main() {
                         if day.len() - start_hour_index <= length as usize {
                             lhs
                         } else {
-                            lhs + assigned_length_time[&(hour.id(), length, person.id())]
+                            lhs + assigned_to_period[&(hour.id(), length, person.id())]
                         }
                     },
                 );
 
-                // The number of shifts of length (n - 1) must be equal to the number of shifts of length n, plus 1
                 model.add_constraint(constraint!(lhs == 0));
             }
         }
