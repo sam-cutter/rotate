@@ -1,4 +1,6 @@
-use good_lp::{Expression, ProblemVariables, SolverModel, Variable, constraint, scip, variable};
+use good_lp::{
+    Expression, ProblemVariables, Solution, SolverModel, Variable, constraint, scip, variable,
+};
 use std::collections::HashMap;
 
 use crate::{
@@ -199,6 +201,24 @@ fn main() {
                 // The number of shifts of length (n - 1) must be equal to the number of shifts of length n, plus 1
                 model.add_constraint(constraint!(lhs == 0));
             }
+        }
+    }
+
+    let solution = model.solve().unwrap();
+
+    for (day_index, day) in hours.iter().enumerate() {
+        println!("\n\nDAY {}", day_index);
+
+        for (hour_index, hour) in day.iter().enumerate() {
+            print!("hour {}", hour_index);
+
+            let assigned: Vec<String> = people
+                .iter()
+                .filter(|person| solution.value(assigned[&(hour.id(), person.id())]) == 1.0)
+                .map(|person| person.id().to_string())
+                .collect();
+
+            println!("{}", assigned.join(", "));
         }
     }
 }
