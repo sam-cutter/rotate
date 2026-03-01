@@ -35,7 +35,7 @@ impl Person {
         self.minimum_weekly_hours
     }
 
-    pub fn strength_val(&self) -> f32 {
+    pub fn strength(&self) -> f32 {
         self.strength
     }
 

@@ -77,10 +77,11 @@ fn main() {
         ));
     }
 
+    // Ensures that the minimum average strength target for each hour is met.
     for hour in &hours {
         model.add_constraint(constraint!(
             people.iter().fold(Expression::default(), |lhs, person| {
-                lhs + assigned[&(hour.id(), person.id())] * person.strength_val()
+                lhs + assigned[&(hour.id(), person.id())] * person.strength()
             }) >= (hour.min_avg_strength() as i32)
                 * people.iter().fold(Expression::default(), |lhs, person| {
                     lhs + assigned[&(hour.id(), person.id())]
