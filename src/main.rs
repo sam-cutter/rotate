@@ -11,24 +11,48 @@ mod hour;
 mod person;
 mod role;
 
+const MINIMUM_SHIFT_LENGTH: u32 = 4;
+
 fn main() {
     // Must be run for one week at a time.
 
-    let hours: Vec<Hour> = Vec::new();
+    let hours: Vec<Vec<Hour>> = Vec::new();
+
+    let hours_flat: Vec<&Hour> = hours.iter().flat_map(|day| day.iter()).collect();
     let people: Vec<Person> = Vec::new();
     let roles: Vec<RoleId> = Vec::new();
 
     let mut variables = ProblemVariables::new();
 
     let mut assigned: HashMap<(HourId, PersonId), Variable> = HashMap::new();
+    let mut assigned_length_time: HashMap<(HourId, u32, PersonId), Variable> = HashMap::new();
 
-    for hour in &hours {
+    // Create the assignment variables
+    for hour in &hours_flat {
         for person in &people {
             assigned.insert((hour.id(), person.id()), variables.add(variable().binary()));
         }
     }
 
-    let total_wages_paid = hours.iter().fold(Expression::default(), |lhs, hour| {
+    // Create the variables which indicate if someone is assigned for a certain length of time, starting at a certain hour
+    for person in &people {
+        for day in &hours {
+            for length in 0..=MINIMUM_SHIFT_LENGTH {
+                for (i, hour) in day.iter().enumerate() {
+                    if day.len() - i <= length as usize {
+                        continue;
+                    }
+
+                    assigned_length_time.insert(
+                        (hour.id(), length, person.id()),
+                        variables.add(variable().binary()),
+                    );
+                }
+            }
+        }
+    }
+
+    let total_wages_paid = hours_flat.iter().fold(Expression::default(), |lhs, hour| {
         lhs + people.iter().fold(Expression::default(), |lhs, person| {
             lhs + assigned[&(hour.id(), person.id())] * person.hourly_rate()
         })
@@ -37,7 +61,7 @@ fn main() {
     let mut model = variables.minimise(total_wages_paid).using(scip);
 
     // Ensures that people are only assigned to hours they are available for.
-    for hour in &hours {
+    for hour in &hours_flat {
         for person in &people {
             if person.available(hour.id()) {
                 model.add_constraint(constraint!(assigned[&(hour.id(), person.id())] <= 1));
@@ -48,7 +72,7 @@ fn main() {
     }
 
     // Ensures that there are sufficient workers of each role for each shift.
-    for hour in &hours {
+    for hour in &hours_flat {
         for role in &roles {
             let coverage = people.iter().fold(Expression::default(), |lhs, person| {
                 if person.role() == *role {
@@ -64,9 +88,10 @@ fn main() {
 
     // Ensures that the person is working within their range of minimum and maximum hours for that week.
     for person in &people {
-        let shifts_assigned_to_this_week = hours.iter().fold(Expression::default(), |lhs, hour| {
-            lhs + assigned[&(hour.id(), person.id())]
-        });
+        let shifts_assigned_to_this_week =
+            hours_flat.iter().fold(Expression::default(), |lhs, hour| {
+                lhs + assigned[&(hour.id(), person.id())]
+            });
 
         model.add_constraint(constraint!(
             shifts_assigned_to_this_week.clone() >= person.minimum_weekly_hours() as i32
@@ -78,7 +103,7 @@ fn main() {
     }
 
     // Ensures that the minimum average strength target for each hour is met.
-    for hour in &hours {
+    for hour in &hours_flat {
         model.add_constraint(constraint!(
             people.iter().fold(Expression::default(), |lhs, person| {
                 lhs + assigned[&(hour.id(), person.id())] * person.strength()
@@ -88,4 +113,7 @@ fn main() {
                 })
         ));
     }
+
+    // Makes sure that the variables which indicate if someone is assigned for a certain length of time, starting at a certain hour are synced
+    // TODO
 }
