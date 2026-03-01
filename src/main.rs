@@ -12,6 +12,7 @@ mod person;
 mod role;
 
 const MINIMUM_SHIFT_LENGTH: u32 = 4;
+const MAXIMUM_SHIFT_LENGTH: u32 = 8;
 
 fn main() {
     // Must be run for one week at a time.
@@ -37,7 +38,7 @@ fn main() {
     // Create the variables which indicate if someone is assigned for a certain length of time, starting at a certain hour
     for person in &people {
         for day in &hours {
-            for length in 0..=MINIMUM_SHIFT_LENGTH {
+            for length in (0..=MINIMUM_SHIFT_LENGTH).chain(MAXIMUM_SHIFT_LENGTH + 1..=24) {
                 for (i, hour) in day.iter().enumerate() {
                     if day.len() - i <= length as usize {
                         continue;
@@ -115,5 +116,89 @@ fn main() {
     }
 
     // Makes sure that the variables which indicate if someone is assigned for a certain length of time, starting at a certain hour are synced
-    // TODO
+    for person in &people {
+        for day in &hours {
+            for length in (0..=MINIMUM_SHIFT_LENGTH).chain(MAXIMUM_SHIFT_LENGTH + 1..=24) {
+                for (start_hour_index, hour) in day.iter().enumerate() {
+                    if day.len() - start_hour_index <= length as usize {
+                        continue;
+                    }
+
+                    let is_assigned_length_time =
+                        assigned_length_time[&(hour.id(), length, person.id())];
+
+                    let count_assigned_shifts_in_period =
+                        (0..length as usize).fold(Expression::default(), |lhs, hour_offset| {
+                            lhs + assigned[&(day[start_hour_index + hour_offset].id(), person.id())]
+                        });
+
+                    // Forces the variable to be 0 if it should be 0
+                    model.add_constraint(constraint!(
+                        is_assigned_length_time * length <= count_assigned_shifts_in_period.clone()
+                    ));
+
+                    // Forces the variable to be 1 if it should be 1
+                    model.add_constraint(constraint!(
+                        is_assigned_length_time * length
+                            >= count_assigned_shifts_in_period - length + 1
+                    ));
+                }
+            }
+        }
+    }
+
+    // Ensures that no shifts are less long than the minimum shift length
+    for person in &people {
+        for day in &hours {
+            for length in 2..=MINIMUM_SHIFT_LENGTH {
+                // All shifts of length n - 1
+                let lhs = day.iter().enumerate().fold(
+                    Expression::default(),
+                    |lhs, (start_hour_index, hour)| {
+                        if day.len() - start_hour_index <= (length - 1) as usize {
+                            lhs
+                        } else {
+                            lhs + assigned_length_time[&(hour.id(), length - 1, person.id())]
+                        }
+                    },
+                );
+
+                // All shifts of length n
+                let rhs = day.iter().enumerate().fold(
+                    Expression::default(),
+                    |lhs, (start_hour_index, hour)| {
+                        if day.len() - start_hour_index <= length as usize {
+                            lhs
+                        } else {
+                            lhs + assigned_length_time[&(hour.id(), length, person.id())]
+                        }
+                    },
+                );
+
+                // The number of shifts of length (n - 1) must be equal to the number of shifts of length n, plus 1
+                model.add_constraint(constraint!(lhs == rhs + 1));
+            }
+        }
+    }
+
+    // Ensures that no shifts are longer than the maximum shift length.
+    for person in &people {
+        for day in &hours {
+            for length in MAXIMUM_SHIFT_LENGTH + 1..=24 {
+                let lhs = day.iter().enumerate().fold(
+                    Expression::default(),
+                    |lhs, (start_hour_index, hour)| {
+                        if day.len() - start_hour_index <= length as usize {
+                            lhs
+                        } else {
+                            lhs + assigned_length_time[&(hour.id(), length, person.id())]
+                        }
+                    },
+                );
+
+                // The number of shifts of length (n - 1) must be equal to the number of shifts of length n, plus 1
+                model.add_constraint(constraint!(lhs == 0));
+            }
+        }
+    }
 }
