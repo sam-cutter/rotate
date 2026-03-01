@@ -1,32 +1,18 @@
 use std::collections::HashSet;
 
+use crate::hour::HourId;
+
 pub type PersonId = u32;
 
 pub struct Person {
     id: PersonId,
-    max_hours_weekly: u32,
-    min_hours_weekly: u32,
-    pay: f32,
-    availability: HashSet<u32>,
+    maximum_weekly_hours: u32,
+    minimum_weekly_hours: u32,
+    hourly_rate: f32,
+    availability: HashSet<HourId>,
 }
 
 impl Person {
-    pub fn new(
-        id: PersonId,
-        max_hours_weekly: u32,
-        min_hours_weekly: u32,
-        pay: f32,
-        availability: HashSet<u32>,
-    ) -> Self {
-        Person {
-            id,
-            max_hours_weekly,
-            min_hours_weekly,
-            pay,
-            availability,
-        }
-    }
-
     pub fn id(&self) -> PersonId {
         self.id
     }
