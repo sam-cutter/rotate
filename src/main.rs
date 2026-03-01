@@ -28,8 +28,13 @@ fn main() {
         }
     }
 
-    // TODO: add proper objective function
-    let mut model = variables.minimise(Expression::default()).using(scip);
+    let total_wages_paid = hours.iter().fold(Expression::default(), |lhs, hour| {
+        lhs + people.iter().fold(Expression::default(), |lhs, person| {
+            lhs + assigned[&(hour.id(), person.id())] * person.hourly_rate()
+        })
+    });
+
+    let mut model = variables.minimise(total_wages_paid).using(scip);
 
     // Ensures that people are only assigned to hours they are available for.
     for hour in &hours {

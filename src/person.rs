@@ -33,4 +33,8 @@ impl Person {
     pub fn minimum_weekly_hours(&self) -> u32 {
         self.minimum_weekly_hours
     }
+
+    pub fn hourly_rate(&self) -> f32 {
+        self.hourly_rate
+    }
 }
