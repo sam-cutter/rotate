@@ -110,7 +110,7 @@ fn main() {
             lhs + assigned[&(hour.id(), person.id())] * person.strength()
         });
 
-        let minimum_average_strength = hour.min_avg_strength() as i32;
+        let minimum_average_strength = hour.minimum_average_strength() as i32;
 
         let people_working_this_hour = people.iter().fold(Expression::default(), |lhs, person| {
             lhs + assigned[&(hour.id(), person.id())]
