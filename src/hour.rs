@@ -2,10 +2,16 @@ use std::collections::HashMap;
 
 use crate::role::RoleId;
 
-pub type ShiftId = u32;
+pub type HourId = u32;
 
-pub struct Shift {
-    id: ShiftId,
+pub struct Hour {
+    id: HourId,
     minimum_workers_per_role: HashMap<RoleId, u32>,
     minimum_average_strength: f64,
+}
+
+impl Hour {
+    pub fn id(&self) -> HourId {
+        self.id
+    }
 }
