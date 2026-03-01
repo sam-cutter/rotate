@@ -1,4 +1,4 @@
-use good_lp::{Expression, ProblemVariables, Variable, constraint, variable};
+use good_lp::{Expression, ProblemVariables, Variable, constraint, scip, variable};
 use std::collections::HashMap;
 
 use crate::{
@@ -23,4 +23,6 @@ fn main() {
             assigned.insert((hour.id(), person.id()), variables.add(variable().binary()));
         }
     }
+
+    let mut model = variables.minimise(Expression::default()).using(scip);
 }
