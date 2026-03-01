@@ -16,4 +16,7 @@ impl Person {
     pub fn id(&self) -> PersonId {
         self.id
     }
+    pub fn available(&self, hour_id: HourId) -> bool {
+        self.availability.contains(&hour_id)
+    }
 }
