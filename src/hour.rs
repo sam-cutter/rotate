@@ -14,4 +14,8 @@ impl Hour {
     pub fn id(&self) -> HourId {
         self.id
     }
+
+    pub fn minimum_workers(&self, role: RoleId) -> u32 {
+        self.minimum_workers_per_role[&role]
+    }
 }
