@@ -15,6 +15,26 @@ pub struct Person {
 }
 
 impl Person {
+    pub fn new(
+        id: PersonId,
+        role: RoleId,
+        maximum_weekly_hours: u32,
+        minimum_weekly_hours: u32,
+        hourly_rate: f32,
+        availability: HashSet<HourId>,
+        strength: f32,
+    ) -> Self {
+        Person {
+            id,
+            role,
+            maximum_weekly_hours,
+            minimum_weekly_hours,
+            hourly_rate,
+            availability,
+            strength,
+        }
+    }
+
     pub fn id(&self) -> PersonId {
         self.id
     }

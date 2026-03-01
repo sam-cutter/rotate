@@ -11,6 +11,17 @@ pub struct Hour {
 }
 
 impl Hour {
+    pub fn new(
+        id: u32,
+        minimum_workers_per_role: HashMap<RoleId, u32>,
+        minimum_average_strength: f32,
+    ) -> Self {
+        Hour {
+            id,
+            minimum_workers_per_role,
+            minimum_average_strength,
+        }
+    }
     pub fn id(&self) -> HourId {
         self.id
     }
