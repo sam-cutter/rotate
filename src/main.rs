@@ -11,6 +11,7 @@ mod person;
 mod role;
 
 fn main() {
+    // 1 week worth of hours
     let hours: Vec<Hour> = Vec::new();
     let people: Vec<Person> = Vec::new();
 
@@ -36,4 +37,6 @@ fn main() {
             ));
         }
     }
+
+    let mut persons_hours: HashMap<PersonId, u32> = HashMap::new();
 }
