@@ -26,11 +26,11 @@ impl Person {
         self.role
     }
 
-    pub fn max_weekly_hours(&self) -> u32 {
+    pub fn maximum_weekly_hours(&self) -> u32 {
         self.maximum_weekly_hours
     }
 
-    pub fn min_weekly_hours(&self) -> u32 {
+    pub fn minimum_weekly_hours(&self) -> u32 {
         self.minimum_weekly_hours
     }
 }

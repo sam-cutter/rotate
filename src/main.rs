@@ -12,7 +12,8 @@ mod person;
 mod role;
 
 fn main() {
-    // 1 week worth of hours
+    // Must be run for one week at a time.
+
     let hours: Vec<Hour> = Vec::new();
     let people: Vec<Person> = Vec::new();
     let roles: Vec<RoleId> = Vec::new();
@@ -33,13 +34,11 @@ fn main() {
     // Ensures that people are only assigned to hours they are available for.
     for hour in &hours {
         for person in &people {
-            model.add_constraint(constraint!(
-                assigned[&(hour.id(), person.id())]
-                    <= match person.available(hour.id()) {
-                        true => 1,
-                        false => 0,
-                    }
-            ));
+            if person.available(hour.id()) {
+                model.add_constraint(constraint!(assigned[&(hour.id(), person.id())] <= 1));
+            } else {
+                model.add_constraint(constraint!(assigned[&(hour.id(), person.id())] == 0));
+            }
         }
     }
 
@@ -58,11 +57,18 @@ fn main() {
         }
     }
 
+    // Ensures that the person is working within their range of minimum and maximum hours for that week.
     for person in &people {
+        let shifts_assigned_to_this_week = hours.iter().fold(Expression::default(), |lhs, hour| {
+            lhs + assigned[&(hour.id(), person.id())]
+        });
+
         model.add_constraint(constraint!(
-            hours.iter().fold(Expression::default(), |lhs, hour| {
-                lhs + assigned[&(hour.id(), person.id())]
-            }) >= person.min_weekly_hours() as i32
+            shifts_assigned_to_this_week.clone() >= person.minimum_weekly_hours() as i32
+        ));
+
+        model.add_constraint(constraint!(
+            shifts_assigned_to_this_week.clone() <= person.maximum_weekly_hours() as i32
         ));
     }
 }
