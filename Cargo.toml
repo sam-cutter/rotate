@@ -8,4 +8,3 @@ good_lp = { version = "*", features = [
     "scip",
     "scip_bundled",
 ], default-features = false }
-itertools = "0.14.0"

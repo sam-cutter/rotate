@@ -1,7 +1,7 @@
 use good_lp::{
     Expression, ProblemVariables, Solution, SolverModel, Variable, constraint, scip, variable,
 };
-use itertools::Itertools;
+
 use std::collections::{HashMap, HashSet};
 
 use crate::{
@@ -14,18 +14,14 @@ mod hour;
 mod person;
 mod role;
 
-const MINIMUM_SHIFT_LENGTH: u32 = 4;
+const MINIMUM_SHIFT_LENGTH: u32 = 2;
 const MAXIMUM_SHIFT_LENGTH: u32 = 8;
 
 fn main() {
     // Must be run for one week at a time.
-    // Return (hours, blacklist_employee_pairs, people, roles, person_id_to_name)
-    let test_data = test_data();
-    let hours: Vec<Vec<Hour>> = Vec::new();
+    let (hours, blacklist_employee_pairs, people, roles, person_id_to_name) = test_data();
+
     let hours_flat: Vec<&Hour> = hours.iter().flat_map(|day| day.iter()).collect();
-    let people: Vec<Person> = Vec::new();
-    let roles: Vec<RoleId> = Vec::new();
-    let blacklist_employee_pairs: HashSet<(PersonId, PersonId)> = HashSet::new();
 
     let mut variables = ProblemVariables::new();
     let mut assigned: HashMap<(HourId, PersonId), Variable> = HashMap::new();
@@ -38,16 +34,7 @@ fn main() {
             assigned.insert((hour.id(), person.id()), variables.add(variable().binary()));
         }
     }
-    for person_a in &people {
-        for person_b in &people {
-            for hour in &hours_flat {
-                assigned_pairs.insert(
-                    (person_a.id(), person_b.id(), hour.id()),
-                    variables.add(variable().binary()),
-                );
-            }
-        }
-    }
+
     // Create the variables which indicate if someone is assigned for a certain period.
     for person in &people {
         for day in &hours {
@@ -62,6 +49,18 @@ fn main() {
                         variables.add(variable().binary()),
                     );
                 }
+            }
+        }
+    }
+
+    // Create the variables which indicate if two people are on shift together.
+    for person_a in &people {
+        for person_b in &people {
+            for hour in &hours_flat {
+                assigned_pairs.insert(
+                    (person_a.id(), person_b.id(), hour.id()),
+                    variables.add(variable().binary()),
+                );
             }
         }
     }
@@ -222,15 +221,19 @@ fn main() {
         }
     }
 
-    for hour in &hours_flat {
+    // Ensures that blacklisted pairings are not created.
+    for &hour in &hours_flat {
         for person_a in &people {
             for person_b in &people {
                 let paired: Variable = assigned_pairs[&(person_a.id(), person_b.id(), hour.id())];
+
                 let a_assigned: Variable = assigned[&(hour.id(), person_a.id())];
                 let b_assigned: Variable = assigned[&(hour.id(), person_b.id())];
+
                 model.add_constraint(constraint!(paired <= a_assigned));
                 model.add_constraint(constraint!(paired <= b_assigned));
                 model.add_constraint(constraint!(paired >= a_assigned + b_assigned - 1));
+
                 if blacklist_employee_pairs.contains(&(person_a.id(), person_b.id()))
                     || blacklist_employee_pairs.contains(&(person_b.id(), person_a.id()))
                 {
@@ -246,12 +249,12 @@ fn main() {
         println!("\n\nDAY {}", day_index);
 
         for (hour_index, hour) in day.iter().enumerate() {
-            print!("hour {}", hour_index);
+            print!("hour {}: ", hour_index);
 
             let assigned: Vec<String> = people
                 .iter()
                 .filter(|person| solution.value(assigned[&(hour.id(), person.id())]) == 1.0)
-                .map(|person| person.id().to_string())
+                .map(|person| person_id_to_name[&person.id()].clone())
                 .collect();
 
             println!("{}", assigned.join(", "));
@@ -333,7 +336,7 @@ fn test_data() -> (
             person_id,
             0,
             8,
-            2,
+            0,
             9.45,
             vec![9, 10, 11, 12, 13, 14, 15].iter().cloned().collect(),
             10.0,
@@ -358,7 +361,7 @@ fn test_data() -> (
             0,
             8,
             0,
-            11.45,
+            12.45,
             vec![9, 10, 11, 12, 13, 14, 15].iter().cloned().collect(),
             10.0,
         ))
@@ -369,7 +372,7 @@ fn test_data() -> (
             person_id,
             0,
             8,
-            2,
+            0,
             9.45,
             vec![16, 17, 18, 19, 20, 21].iter().cloned().collect(),
             10.0,
@@ -393,8 +396,8 @@ fn test_data() -> (
             person_id,
             0,
             8,
-            0,
-            11.45,
+            2,
+            12.45,
             vec![16, 17, 18, 19, 20, 21].iter().cloned().collect(),
             10.0,
         ))
@@ -409,3 +412,35 @@ fn test_data() -> (
         person_id_to_name,
     )
 }
+
+// fn test_data() -> (
+//     Vec<Vec<Hour>>,
+//     HashSet<(PersonId, PersonId)>,
+//     Vec<Person>,
+//     Vec<RoleId>,
+//     HashMap<PersonId, String>,
+// ) {
+//     let hours = vec![vec![Hour::new(
+//         0,
+//         vec![(0, 1)].iter().cloned().collect(),
+//         7.0,
+//     )]];
+
+//     let blacklisted_pairs = HashSet::new();
+
+//     let people = vec![Person::new(
+//         0,
+//         0,
+//         8,
+//         0,
+//         9.45,
+//         vec![0].iter().cloned().collect(),
+//         10.0,
+//     )];
+
+//     let roles = vec![0];
+
+//     let mapping = vec![(0, "Shay".to_string())].iter().cloned().collect();
+
+//     return (hours, blacklisted_pairs, people, roles, mapping);
+// }
