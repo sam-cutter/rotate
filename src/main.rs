@@ -25,7 +25,9 @@ fn main() {
         }
     }
 
+    // TODO: add proper objective function
     let mut model = variables.minimise(Expression::default()).using(scip);
+
     for hour in &hours {
         for person in &people {
             model.add_constraint(constraint!(
