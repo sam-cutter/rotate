@@ -65,4 +65,15 @@ fn main() {
             }) >= person.min_weekly_hours() as i32
         ));
     }
+
+    for hour in &hours {
+        model.add_constraint(constraint!(
+            people.iter().fold(Expression::default(), |lhs, person| {
+                lhs + assigned[&(hour.id(), person.id())] * person.strength_val()
+            }) >= (hour.min_avg_strength() as i32)
+                * people.iter().fold(Expression::default(), |lhs, person| {
+                    lhs + assigned[&(hour.id(), person.id())]
+                })
+        ));
+    }
 }

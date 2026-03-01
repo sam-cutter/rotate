@@ -11,6 +11,7 @@ pub struct Person {
     minimum_weekly_hours: u32,
     hourly_rate: f32,
     availability: HashSet<HourId>,
+    strength: f32,
 }
 
 impl Person {
@@ -32,5 +33,9 @@ impl Person {
 
     pub fn min_weekly_hours(&self) -> u32 {
         self.minimum_weekly_hours
+    }
+
+    pub fn strength_val(&self) -> f32 {
+        self.strength
     }
 }
